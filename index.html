@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Contador Eléctrico 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Contador">
+<meta name="theme-color" content="#1A6BBF">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #f0f4f8;
+    --surface:  #ffffff;
+    --card:     #ffffff;
+    --border:   #c8d8ea;
+    --accent:   #1a6bbf;
+    --accent2:  #d45e00;
+    --green:    #16803c;
+    --red:      #c0392b;
+    --text:     #1a2436;
+    --muted:    #5a7a99;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Barlow', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle pattern background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(26,107,191,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,107,191,0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+
+  /* ── Header ── */
+  header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(26,107,191,0.10) 0%, transparent 100%);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-family: var(--mono); color: var(--accent); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
+  .logo span { color: var(--muted); }
+  .current-time { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .header-title { margin-top: 6px; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-title em { color: var(--accent); font-style: normal; }
+
+  /* ── Tabs ── */
+  nav {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: rgba(255,255,255,0.97);
+    border-top: 2px solid var(--border);
+    display: flex;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  }
+  nav button {
+    flex: 1; padding: 12px 4px 10px;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-family: var(--sans); font-size: 10px;
+    font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    transition: color 0.2s;
+  }
+  nav button.active { color: var(--accent); }
+  nav button .icon { font-size: 18px; }
+
+  /* ── Sections ── */
+  section { display: none; padding: 16px; animation: fadeIn 0.25s ease; }
+  section.active { display: block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+  }
+  .card-title .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); margin-right: 6px; vertical-align: middle;
+  }
+
+  /* ── Stat grid ── */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .stat {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 5px; font-weight: 700; }
+  .stat-value { font-family: var(--mono); font-size: 22px; color: var(--accent); line-height: 1; font-weight: 700; }
+  .stat-value.orange { color: var(--accent2); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-unit { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Form ── */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  input[type=number], input[type=time], input[type=date], select {
+    width: 100%; padding: 13px 14px;
+    background: #f8fafc; border: 2px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-family: var(--mono); font-size: 18px;
+    outline: none; transition: border-color 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,107,191,0.12); background: #fff; }
+  input::placeholder { color: #aac0d6; font-size: 14px; }
+
+  .btn {
+    width: 100%; padding: 15px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 8px;
+    font-family: var(--sans); font-weight: 700; font-size: 15px;
+    letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(26,107,191,0.25);
+  }
+  .btn:hover { background: #155da0; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.danger { background: var(--red); color: #fff; box-shadow: 0 2px 8px rgba(192,57,43,0.2); }
+  .btn.secondary { background: #e2eaf3; color: var(--text); box-shadow: none; }
+
+  /* ── Progress bar ── */
+  .progress-wrap { margin: 10px 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .progress-bar { height: 8px; background: #dde8f0; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.6s ease; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: #e8f0f8; padding: 11px 8px;
+    text-align: center; font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+    border-bottom: 2px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid #dde8f0; transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(26,107,191,0.05); }
+  tbody tr.today { background: rgba(26,107,191,0.10); }
+  tbody tr.today td { color: var(--accent); font-weight: 700; }
+  tbody tr.prev-month td:first-child { color: var(--muted); font-style: italic; }
+  td { padding: 10px 8px; text-align: center; font-family: var(--mono); font-size: 12px; }
+  td.day-cell { font-weight: 700; font-family: var(--sans); font-size: 13px; }
+  td.kwh { color: var(--accent); font-weight: 600; }
+  td.cost { color: var(--accent2); font-weight: 600; }
+  td.total { color: var(--green); font-weight: 600; }
+  .no-data { color: #aac0d6; font-size: 11px; }
+  tfoot td { background: #e8f0f8; font-weight: 700; color: var(--text); border-top: 2px solid var(--border); }
+
+  /* ── Chart ── */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--green); color: #fff; padding: 12px 24px;
+    border-radius: 24px; font-size: 14px; font-weight: 700;
+    opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200;
+    white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.error { background: var(--red); color: #fff; }
+
+  /* ── Month selector ── */
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .month-nav button { background: var(--surface); border: 2px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 20px; font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+  .month-nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .month-name { font-family: var(--mono); font-size: 15px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+
+  /* ── Tariff display ── */
+  .tariff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tariff-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #f4f8fc; border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px;
+    font-size: 12px;
+  }
+  .tariff-range { color: var(--muted); font-family: var(--mono); font-weight: 600; }
+  .tariff-price { color: var(--accent2); font-family: var(--mono); font-weight: 700; }
+  .tariff-row.active-tier { border: 2px solid var(--accent); background: rgba(26,107,191,0.08); }
+  .tariff-row.active-tier .tariff-range { color: var(--accent); }
+
+  /* ── Delete button in table ── */
+  .del-btn { background: none; border: none; color: #aac0d6; cursor: pointer; font-size: 15px; padding: 3px 6px; border-radius: 4px; }
+  .del-btn:hover { color: var(--red); background: rgba(192,57,43,0.1); }
+
+  /* ── Summary annual ── */
+  .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #dde8f0; font-size: 14px; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .smes { font-weight: 600; color: var(--text); }
+  .summary-row .skwh { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+  .summary-row .scost { font-family: var(--mono); color: var(--accent2); font-weight: 700; }
+  .summary-row.total-row { background: #e8f0f8; font-weight: 700; border-radius: 0 0 10px 10px; }
+
+  /* ── Cycle indicator ── */
+  .cycle-info { display: flex; gap: 8px; margin-bottom: 14px; }
+  .cycle-badge {
+    flex: 1; background: #f4f8fc; border: 2px solid var(--border);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .cycle-badge .cb-val { font-family: var(--mono); font-size: 22px; color: var(--accent); font-weight: 700; }
+  .cycle-badge .cb-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 3px; font-weight: 700; }
+
+  .blink { animation: blink 1.5s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="header-top">
+      <div class="logo"><span>//</span> GASTO <span>//</span></div>
+      <div class="current-time" id="clock">--:--:--</div>
+    </div>
+    <div class="header-title">Contador <em>Eléctrico</em> 2026</div>
+  </header>
+
+  <!-- INICIO -->
+  <section id="sec-home" class="active">
+    <!-- Stats rápidas -->
+    <div class="stats-grid" style="margin-top:14px">
+      <div class="stat">
+        <div class="stat-label">Lectura Actual</div>
+        <div class="stat-value" id="s-lectura">—</div>
+        <div class="stat-unit">kWh contador</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Consumo Hoy</div>
+        <div class="stat-value orange" id="s-hoy">—</div>
+        <div class="stat-unit">kWh</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Consumo Ciclo</div>
+        <div class="stat-value green" id="s-ciclo">—</div>
+        <div class="stat-unit">kWh del período</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Gasto Total</div>
+        <div class="stat-value orange" id="s-gasto">—</div>
+        <div class="stat-unit">$ acumulado</div>
+      </div>
+      <div class="stat" style="grid-column:1/-1">
+        <div class="stat-label">Lectura Inicial del Ciclo</div>
+        <div class="stat-value" id="s-inicial" style="color:var(--muted)">—</div>
+        <div class="stat-unit">kWh al inicio del período</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">kWh Estimados</div>
+        <div class="stat-value green" id="s-kwh-est">—</div>
+        <div class="stat-unit">~ al cierre del ciclo</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Monto Estimado</div>
+        <div class="stat-value orange" id="s-monto-est">—</div>
+        <div class="stat-unit">~ CUP al cierre</div>
+      </div>
+    </div>
+
+    <!-- Progreso del ciclo -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Progreso del Ciclo</div>
+      <div class="cycle-info">
+        <div class="cycle-badge"><div class="cb-val" id="cb-dias">0</div><div class="cb-lbl">Días registrados</div></div>
+        <div class="cycle-badge"><div class="cb-val" id="cb-restantes">—</div><div class="cb-lbl">Días al cierre</div></div>
+        <div class="cycle-badge"><div class="cb-val" id="cb-promedio">—</div><div class="cb-lbl">kWh/día prom.</div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span id="prog-start">—</span><span id="prog-end">—</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center" id="prog-label">Sin datos aún</div>
+    </div>
+
+    <!-- Gráfica consumo diario -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Consumo Diario (kWh)</div>
+      <div class="chart-wrap"><canvas id="chart-daily"></canvas></div>
+    </div>
+
+    <!-- Formulario entrada -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Registrar Lectura</div>
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="inp-fecha">
+      </div>
+      <div class="form-group">
+        <label>Lectura del Contador (kWh)</label>
+        <input type="number" id="inp-lectura" placeholder="ej. 30275" step="1">
+      </div>
+      <div class="form-group">
+        <label>Hora de Lectura</label>
+        <input type="time" id="inp-hora">
+      </div>
+      <button class="btn" onclick="saveReading()">⚡ Guardar Lectura</button>
+    </div>
+  </section>
+
+  <!-- MES -->
+  <section id="sec-mes">
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <div class="month-name" id="month-title">—</div>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+
+    <!-- Stats del mes -->
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-label">Consumo Ciclo</div>
+        <div class="stat-value" id="m-consumo">—</div>
+        <div class="stat-unit">kWh</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Gasto Estimado</div>
+        <div class="stat-value orange" id="m-gasto">—</div>
+        <div class="stat-unit">pesos CUP</div>
+      </div>
+    </div>
+
+    <!-- Gráfica mes -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Consumo Diario del Período</div>
+      <div class="chart-wrap"><canvas id="chart-mes"></canvas></div>
+    </div>
+
+    <!-- Tabla lecturas -->
+    <div class="card" style="padding:0">
+      <div style="padding:12px 14px 0"><div class="card-title"><span class="dot"></span>Registro de Lecturas</div></div>
+      <div class="table-wrap" style="border:none;border-radius:0 0 12px 12px">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Hora</th>
+              <th>Lectura</th>
+              <th>kWh/día</th>
+              <th>$ Día</th>
+              <th>$ Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="table-mes"></tbody>
+          <tfoot id="table-mes-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESUMEN ANUAL -->
+  <section id="sec-resumen">
+    <div class="card" style="padding:0">
+      <div style="padding:14px 14px 8px"><div class="card-title"><span class="dot"></span>Resumen Anual 2026</div></div>
+      <div id="summary-list"></div>
+    </div>
+
+    <!-- Gráfica anual -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Consumo por Mes (kWh)</div>
+      <div class="chart-wrap"><canvas id="chart-anual"></canvas></div>
+    </div>
+
+    <!-- Tarifas -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Rangos Tarifarios Vigentes</div>
+      <div class="tariff-grid" id="tariff-grid"></div>
+    </div>
+  </section>
+
+  <!-- CONFIGURACIÓN -->
+  <section id="sec-config">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Configuración del Ciclo</div>
+      <div class="form-group">
+        <label>Día de inicio del ciclo (lectura inicial)</label>
+        <select id="cfg-cycle-day">
+          <option value="27">Día 27</option>
+          <option value="28" selected>Día 28</option>
+          <option value="29">Día 29</option>
+          <option value="30">Día 30</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Lectura inicial del ciclo actual (kWh) <span style="font-size:10px;color:var(--accent)">(opcional — sobreescribe el cálculo automático)</span></label>
+        <input type="number" id="cfg-initial" placeholder="ej. 30401">
+      </div>
+      <button class="btn" onclick="saveConfig()" style="margin-bottom:10px">Guardar Configuración</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Gestión de Datos</div>
+      <button class="btn secondary" onclick="exportData()" style="margin-bottom:10px">📥 Exportar datos (JSON)</button>
+      <button class="btn danger" onclick="confirmClear()">🗑 Borrar todos los datos</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Acerca de</div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.7">
+        App de registro del consumo eléctrico doméstico. Los datos se guardan en el dispositivo (almacenamiento local del navegador). No requiere internet para funcionar una vez cargada.
+      </p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--mono)">v1.0 · 2026</p>
+    </div>
+  </section>
+
+</div><!-- /app -->
+
+<nav>
+  <button class="active" onclick="showTab('home',this)"><span class="icon">⚡</span>Inicio</button>
+  <button onclick="showTab('mes',this)"><span class="icon">📅</span>Mes</button>
+  <button onclick="showTab('resumen',this)"><span class="icon">📊</span>Resumen</button>
+  <button onclick="showTab('config',this)"><span class="icon">⚙️</span>Config</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// TARIFAS
+// ═══════════════════════════════════════════════════════
+const TARIFAS = [
+  { max: 100,   price: 0.33,  label: '0 – 100' },
+  { max: 150,   price: 1.07,  label: '101 – 150' },
+  { max: 200,   price: 1.43,  label: '151 – 200' },
+  { max: 250,   price: 2.46,  label: '201 – 250' },
+  { max: 300,   price: 3.00,  label: '251 – 300' },
+  { max: 350,   price: 4.00,  label: '301 – 350' },
+  { max: 400,   price: 5.00,  label: '351 – 400' },
+  { max: 450,   price: 6.00,  label: '401 – 450' },
+  { max: 500,   price: 7.00,  label: '451 – 500' },
+  { max: 600,   price: 9.20,  label: '501 – 600' },
+  { max: 700,   price: 9.45,  label: '601 – 700' },
+  { max: 1000,  price: 9.85,  label: '701 – 1000' },
+  { max: 1800,  price: 10.80, label: '1001 – 1800' },
+  { max: 2600,  price: 11.80, label: '1801 – 2600' },
+  { max: 3400,  price: 12.90, label: '2601 – 3400' },
+  { max: 4200,  price: 13.95, label: '3401 – 4200' },
+  { max: 5000,  price: 15.00, label: '4201 – 5000' },
+  { max: Infinity, price: 20.00, label: 'Más de 5000' },
+];
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function calcCost(kwh) {
+  if (kwh <= 0) return 0;
+  let cost = 0, remaining = kwh, prev = 0;
+  for (const t of TARIFAS) {
+    const limit = t.max === Infinity ? Infinity : t.max;
+    const chunk = Math.min(remaining, limit - prev);
+    if (chunk <= 0) break;
+    cost += chunk * t.price;
+    remaining -= chunk;
+    prev = limit;
+    if (remaining <= 0) break;
+  }
+  return cost;
+}
+
+function getTariffTier(kwh) {
+  let prev = 0;
+  for (const t of TARIFAS) {
+    if (kwh <= t.max) return { label: t.label, price: t.price };
+    prev = t.max;
+  }
+  return TARIFAS[TARIFAS.length-1];
+}
+
+// ═══════════════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════════════
+function loadData() {
+  try {
+    return JSON.parse(localStorage.getItem('elec2026') || '{"readings":[],"cycleDay":28,"initialReading":null}');
+  } catch(e) { return { readings: [], cycleDay: 28, initialReading: null }; }
+}
+function saveData(d) { localStorage.setItem('elec2026', JSON.stringify(d)); }
+
+// ═══════════════════════════════════════════════════════
+// CICLO: dado un mes (1-12), devuelve el rango de fechas del ciclo
+// El ciclo de "mes N" va desde día cycleDay del mes N-1 hasta día cycleDay-1 del mes N
+// ═══════════════════════════════════════════════════════
+function getCycleRange(year, month, cycleDay) {
+  // mes: 1-12
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear  = month === 1 ? year - 1 : year;
+  const start = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
+  // Fin: último día justo antes del cycleDay del mes actual
+  // Ej. ciclo Feb: inicia 28-Ene, termina 27-Feb (el día antes del 28 de feb)
+  const endDay = cycleDay - 1;
+  let endMonth = month, endYear = year;
+  // Si cycleDay=28 el fin es el 27 del mes actual
+  const end = `${endYear}-${String(endMonth).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
+  return { start, end };
+}
+
+// Lecturas de un ciclo ordenadas
+function getCycleReadings(year, month) {
+  const data = loadData();
+  const { start, end } = getCycleRange(year, month, data.cycleDay);
+  return data.readings
+    .filter(r => r.date >= start && r.date <= end)
+    .sort((a,b) => a.date.localeCompare(b.date));
+}
+
+// ═══════════════════════════════════════════════════════
+// GUARDAR LECTURA
+// ═══════════════════════════════════════════════════════
+function saveReading() {
+  const fecha   = document.getElementById('inp-fecha').value;
+  const lectura = parseFloat(document.getElementById('inp-lectura').value);
+  const hora    = document.getElementById('inp-hora').value;
+
+  if (!fecha) { showToast('Selecciona una fecha', true); return; }
+  if (isNaN(lectura) || lectura < 0) { showToast('Ingresa una lectura válida', true); return; }
+
+  const data = loadData();
+
+  // Verificar que no baje respecto a la lectura anterior del mismo ciclo
+  const allSorted = [...data.readings].sort((a,b) => a.date.localeCompare(b.date));
+  const prevRead = allSorted.filter(r => r.date < fecha).pop();
+  if (prevRead && lectura < prevRead.reading) {
+    showToast(`⚠️ Lectura menor que la anterior (${prevRead.reading})`, true);
+    return;
+  }
+
+  // Verificar duplicado de fecha
+  const existing = data.readings.findIndex(r => r.date === fecha);
+  if (existing >= 0) {
+    data.readings[existing] = { date: fecha, reading: lectura, time: hora };
+    showToast('✓ Lectura actualizada');
+  } else {
+    data.readings.push({ date: fecha, reading: lectura, time: hora });
+    showToast('✓ Lectura guardada');
+  }
+
+  saveData(data);
+  renderHome();
+  renderCurrentMonthTable();
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER HOME
+// ═══════════════════════════════════════════════════════
+function renderHome() {
+  const data = loadData();
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + 1;
+
+  const readings = getCycleReadings(year, month);
+
+  if (readings.length === 0) {
+    ['s-lectura','s-hoy','s-ciclo','s-gasto','s-inicial','s-kwh-est','s-monto-est'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('cb-dias').textContent = '0';
+    document.getElementById('cb-restantes').textContent = '—';
+    document.getElementById('cb-promedio').textContent = '—';
+    document.getElementById('prog-label').textContent = 'Sin lecturas registradas aún';
+    document.getElementById('prog-fill').style.width = '0%';
+    renderDailyChart([], []);
+    return;
+  }
+
+  const last = readings[readings.length - 1];
+  const first = readings[0];
+
+  // Lectura inicial: última lectura registrada ANTES (no incluida) del inicio del ciclo
+  // Si hay override manual en Config, ese prevalece
+  const { start, end } = getCycleRange(year, month, data.cycleDay);
+  const allSortedAll = [...data.readings].sort((a,b) => a.date.localeCompare(b.date));
+  const lecturaInicialObj = allSortedAll.filter(r => r.date < start).pop();
+  const lecturaInicial = (data.initialReading && data.initialReading > 0)
+    ? data.initialReading
+    : (lecturaInicialObj ? lecturaInicialObj.reading : first.reading);
+
+  // Consumo ciclo
+  const consumoCiclo = last.reading - lecturaInicial;
+  const gastoCiclo   = calcCost(consumoCiclo);
+
+  // Consumo hoy
+  let consumoHoy = '—';
+  const todayStr = toLocalDateStr(today);
+  const todayRead = readings.find(r => r.date === todayStr);
+  const prevRead  = readings.filter(r => r.date < todayStr).pop();
+  if (todayRead && prevRead) consumoHoy = todayRead.reading - prevRead.reading;
+  else if (todayRead && readings.indexOf(todayRead) > 0) {
+    const idx = readings.indexOf(todayRead);
+    consumoHoy = todayRead.reading - readings[idx-1].reading;
+  }
+
+  document.getElementById('s-lectura').textContent = last.reading.toLocaleString();
+  document.getElementById('s-hoy').textContent     = consumoHoy === '—' ? '—' : consumoHoy + ' kWh';
+  document.getElementById('s-ciclo').textContent   = consumoCiclo + ' kWh';
+  document.getElementById('s-gasto').textContent   = '$' + gastoCiclo.toFixed(2);
+  document.getElementById('s-inicial').textContent = lecturaInicial.toLocaleString();
+
+  // Progreso
+  const startD  = new Date(start + 'T12:00:00');
+  const endD    = new Date(end + 'T12:00:00');
+  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+  const daysReg   = readings.length;
+  const daysLeft  = Math.max(0, Math.round((endD - today) / 86400000));
+  const pct       = Math.min(100, Math.round(daysReg / totalDays * 100));
+  const promDia   = daysReg > 1 ? (consumoCiclo / (daysReg - 1)).toFixed(1) : '—';
+
+  document.getElementById('cb-dias').textContent      = daysReg;
+  document.getElementById('cb-restantes').textContent = daysLeft;
+  document.getElementById('cb-promedio').textContent  = promDia;
+  document.getElementById('prog-fill').style.width    = pct + '%';
+  document.getElementById('prog-start').textContent   = formatDate(start);
+  document.getElementById('prog-end').textContent     = formatDate(end);
+  document.getElementById('prog-label').textContent   = `${pct}% del ciclo completado`;
+
+  // Proyección al cierre del ciclo
+  if (daysReg > 1) {
+    const promDiaNum = consumoCiclo / (daysReg - 1);
+    const kwhEst     = Math.round(consumoCiclo + promDiaNum * daysLeft);
+    const montoEst   = calcCost(kwhEst);
+    document.getElementById('s-kwh-est').textContent   = '~' + kwhEst + ' kWh';
+    document.getElementById('s-monto-est').textContent = '~$' + montoEst.toFixed(2);
+  } else {
+    document.getElementById('s-kwh-est').textContent   = '—';
+    document.getElementById('s-monto-est').textContent = '—';
+  }
+
+  // Datos para gráfica
+  const labels = [], values = [];
+  for (let i = 1; i < readings.length; i++) {
+    labels.push(readings[i].date.slice(5));
+    values.push(readings[i].reading - readings[i-1].reading);
+  }
+  renderDailyChart(labels, values);
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER TABLA MES
+// ═══════════════════════════════════════════════════════
+let currentViewMonth = new Date().getMonth() + 1;
+let currentViewYear  = new Date().getFullYear();
+
+function changeMonth(dir) {
+  currentViewMonth += dir;
+  if (currentViewMonth > 12) { currentViewMonth = 1; currentViewYear++; }
+  if (currentViewMonth < 1)  { currentViewMonth = 12; currentViewYear--; }
+  renderCurrentMonthTable();
+}
+
+function renderCurrentMonthTable() {
+  const data = loadData();
+  const year = currentViewYear, month = currentViewMonth;
+  document.getElementById('month-title').textContent = MESES[month-1] + ' ' + year;
+
+  const readings = getCycleReadings(year, month);
+  const tbody = document.getElementById('table-mes');
+  const tfoot = document.getElementById('table-mes-foot');
+  tbody.innerHTML = '';
+  tfoot.innerHTML = '';
+
+  if (readings.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="no-data" style="padding:20px">Sin lecturas en este período</td></tr>`;
+    document.getElementById('m-consumo').textContent = '—';
+    document.getElementById('m-gasto').textContent = '—';
+    renderMesChart([], []);
+    return;
+  }
+
+  const labels = [], dailyKwh = [];
+  let totalKwh = 0, totalGasto = 0;
+  const todayStr = toLocalDateStr(new Date());
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear  = month === 1 ? year - 1 : year;
+
+  for (let i = 0; i < readings.length; i++) {
+    const r    = readings[i];
+    const prev = i > 0 ? readings[i-1] : null;
+    const kwh  = prev ? r.reading - prev.reading : null;
+    const cost = kwh !== null ? (kwh / (readings[readings.length-1].reading - readings[0].reading)) * calcCost(readings[readings.length-1].reading - readings[0].reading) : null;
+    // Gasto diario proporcional al kWh del día
+    const gastoDia = kwh !== null && kwh > 0 ? calcCost(kwh) : null;
+
+    if (kwh !== null) { totalKwh += kwh; totalGasto += gastoDia || 0; }
+
+    const rDate = new Date(r.date + 'T12:00:00');
+    const rMonth = rDate.getMonth() + 1;
+    const isPrev = (rMonth === prevMonth && rDate.getFullYear() === prevYear) || (month === 1 && rMonth === 12 && rDate.getFullYear() === year - 1);
+    const isToday = r.date === todayStr;
+
+    const tr = document.createElement('tr');
+    if (isToday) tr.classList.add('today');
+    if (isPrev) tr.classList.add('prev-month');
+
+    const dateLabel = rDate.getDate() + (isPrev ? '<span style="color:var(--muted);font-size:9px"> ant</span>' : '');
+
+    tr.innerHTML = `
+      <td class="day-cell">${dateLabel}</td>
+      <td>${r.time || '—'}</td>
+      <td class="kwh">${r.reading.toLocaleString()}</td>
+      <td class="kwh">${kwh !== null ? kwh + ' kWh' : '<span class="no-data">—</span>'}</td>
+      <td class="cost">${gastoDia !== null ? '$' + gastoDia.toFixed(2) : '<span class="no-data">—</span>'}</td>
+      <td class="total">${kwh !== null ? '$' + totalGasto.toFixed(2) : '<span class="no-data">—</span>'}</td>
+      <td><button class="del-btn" onclick="deleteReading('${r.date}')">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+
+    if (kwh !== null) { labels.push(r.date.slice(5)); dailyKwh.push(kwh); }
+  }
+
+  // Totales
+  const costoTotal = calcCost(totalKwh);
+  tfoot.innerHTML = `<tr><td colspan="3" style="text-align:left;padding:10px 12px">TOTAL CICLO</td><td class="kwh">${totalKwh} kWh</td><td class="cost">$${costoTotal.toFixed(2)}</td><td></td><td></td></tr>`;
+
+  document.getElementById('m-consumo').textContent = totalKwh + ' kWh';
+  document.getElementById('m-gasto').textContent   = '$' + costoTotal.toFixed(2);
+
+  renderMesChart(labels, dailyKwh);
+}
+
+function deleteReading(date) {
+  if (!confirm(`¿Eliminar la lectura del ${formatDate(date)}?`)) return;
+  const data = loadData();
+  data.readings = data.readings.filter(r => r.date !== date);
+  saveData(data);
+  renderHome();
+  renderCurrentMonthTable();
+  showToast('Lectura eliminada');
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER RESUMEN ANUAL
+// ═══════════════════════════════════════════════════════
+function renderResumen() {
+  const list = document.getElementById('summary-list');
+  list.innerHTML = '';
+  const yearLabels = [], yearKwh = [];
+  let grandKwh = 0, grandCost = 0;
+
+  for (let m = 1; m <= 12; m++) {
+    const readings = getCycleReadings(2026, m);
+    let kwh = 0, cost = 0, hasData = false;
+    if (readings.length >= 2) {
+      kwh  = readings[readings.length-1].reading - readings[0].reading;
+      cost = calcCost(kwh);
+      hasData = true;
+      grandKwh += kwh; grandCost += cost;
+    }
+    yearLabels.push(MESES[m-1].slice(0,3));
+    yearKwh.push(hasData ? kwh : null);
+
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    row.innerHTML = `
+      <span class="smes">${MESES[m-1]}</span>
+      <span class="skwh">${hasData ? kwh + ' kWh' : '<span style="color:var(--muted)">—</span>'}</span>
+      <span class="scost">${hasData ? '$' + cost.toFixed(2) : '<span style="color:var(--muted)">—</span>'}</span>
+    `;
+    list.appendChild(row);
+  }
+
+  const totRow = document.createElement('div');
+  totRow.className = 'summary-row total-row';
+  totRow.innerHTML = `<span class="smes">TOTAL AÑO</span><span class="skwh">${grandKwh > 0 ? grandKwh + ' kWh' : '—'}</span><span class="scost">${grandCost > 0 ? '$' + grandCost.toFixed(2) : '—'}</span>`;
+  list.appendChild(totRow);
+
+  renderAnualChart(yearLabels, yearKwh);
+  renderTariffGrid(grandKwh > 0 ? grandKwh : null);
+}
+
+function renderTariffGrid(currentKwh) {
+  const grid = document.getElementById('tariff-grid');
+  grid.innerHTML = '';
+  TARIFAS.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'tariff-row';
+    if (currentKwh && currentKwh <= t.max && (currentKwh > (TARIFAS[TARIFAS.indexOf(t)-1]?.max || 0))) {
+      div.classList.add('active-tier');
+    }
+    div.innerHTML = `<span class="tariff-range">${t.label}</span><span class="tariff-price">$${t.price.toFixed(2)}</span>`;
+    grid.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════
+function loadConfig() {
+  const data = loadData();
+  document.getElementById('cfg-cycle-day').value = data.cycleDay || 28;
+  if (data.initialReading) document.getElementById('cfg-initial').value = data.initialReading;
+}
+
+function saveConfig() {
+  const data = loadData();
+  data.cycleDay = parseInt(document.getElementById('cfg-cycle-day').value);
+  const ini = parseFloat(document.getElementById('cfg-initial').value);
+  if (!isNaN(ini)) data.initialReading = ini;
+  saveData(data);
+  showToast('✓ Configuración guardada');
+  renderHome();
+}
+
+function exportData() {
+  const data = loadData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'electricidad_2026.json';
+  a.click();
+  showToast('✓ Datos exportados');
+}
+
+function confirmClear() {
+  if (confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) {
+    localStorage.removeItem('elec2026');
+    showToast('Datos eliminados');
+    renderHome();
+    renderCurrentMonthTable();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// GRÁFICAS
+// ═══════════════════════════════════════════════════════
+const chartCfg = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#ffffff', titleColor: '#1a6bbf', bodyColor: '#1a2436', borderColor: '#c8d8ea', borderWidth: 1 } },
+  scales: {
+    x: { grid: { color: 'rgba(26,107,191,0.08)' }, ticks: { color: '#5a7a99', font: { family: 'Share Tech Mono', size: 10 } } },
+    y: { grid: { color: 'rgba(26,107,191,0.08)' }, ticks: { color: '#5a7a99', font: { family: 'Share Tech Mono', size: 10 } } }
+  }
+};
+
+let chartDaily = null, chartMes = null, chartAnual = null;
+
+function renderDailyChart(labels, values) {
+  const ctx = document.getElementById('chart-daily').getContext('2d');
+  if (chartDaily) chartDaily.destroy();
+  chartDaily = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: 'rgba(26,107,191,0.35)', borderColor: '#1a6bbf', borderWidth: 2, borderRadius: 4 }] },
+    options: { ...chartCfg, plugins: { ...chartCfg.plugins },
+      scales: { ...chartCfg.scales, y: { ...chartCfg.scales.y, min: 0, suggestedMax: 15, title: { display: true, text: 'kWh', color: '#5a7a99', font: { size: 11 } } } } }
+  });
+}
+
+function renderMesChart(labels, values) {
+  const ctx = document.getElementById('chart-mes').getContext('2d');
+  if (chartMes) chartMes.destroy();
+  chartMes = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: 'rgba(212,94,0,0.35)', borderColor: '#d45e00', borderWidth: 2, borderRadius: 4 }] },
+    options: { ...chartCfg, scales: { ...chartCfg.scales, y: { ...chartCfg.scales.y, min: 0 } } }
+  });
+}
+
+function renderAnualChart(labels, values) {
+  const ctx = document.getElementById('chart-anual').getContext('2d');
+  if (chartAnual) chartAnual.destroy();
+  const filtered = values.map(v => v === null ? 0 : v);
+  chartAnual = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: filtered, backgroundColor: 'rgba(22,128,60,0.35)', borderColor: '#16803c', borderWidth: 2, borderRadius: 4 }] },
+    options: { ...chartCfg, scales: { ...chartCfg.scales, y: { ...chartCfg.scales.y, min: 0 } } }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function showTab(tab, btn) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'mes')     { renderCurrentMonthTable(); }
+  if (tab === 'resumen') { renderResumen(); }
+  if (tab === 'config')  { loadConfig(); }
+}
+
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'error show' : 'show';
+  setTimeout(() => t.className = '', 2500);
+}
+
+function formatDate(str) {
+  if (!str) return '—';
+  const [y,m,d] = str.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function toLocalDateStr(date) {
+  return date.getFullYear() + '-' +
+    String(date.getMonth()+1).padStart(2,'0') + '-' +
+    String(date.getDate()).padStart(2,'0');
+}
+
+// Reloj
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Fecha y hora por defecto
+function setDefaults() {
+  const now = new Date();
+  document.getElementById('inp-fecha').value = toLocalDateStr(now);
+  document.getElementById('inp-hora').value  = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+
+// ═══════════════════════════════════════════════════════
+// PRECARGA DE DATOS (Dic 2025 – Mar 2026)
+// Solo se carga si el almacenamiento está vacío
+// ═══════════════════════════════════════════════════════
+function preloadData() {
+  const existing = localStorage.getItem('elec2026');
+  if (existing) return; // ya tiene datos, no sobreescribir
+
+  const preloaded = {"readings":[{"date":"2025-12-29","reading":30136,"time":"09:41"},{"date":"2025-12-30","reading":30140,"time":"17:00"},{"date":"2025-12-31","reading":30144,"time":"17:26"},{"date":"2026-01-01","reading":30149,"time":"17:53"},{"date":"2026-01-02","reading":30153,"time":"05:19"},{"date":"2026-01-03","reading":30157,"time":"17:02"},{"date":"2026-01-04","reading":30161,"time":"05:13"},{"date":"2026-01-05","reading":30166,"time":"17:23"},{"date":"2026-01-06","reading":30170,"time":"17:10"},{"date":"2026-01-07","reading":30174,"time":"17:27"},{"date":"2026-01-08","reading":30178,"time":"17:07"},{"date":"2026-01-09","reading":30183,"time":"16:54"},{"date":"2026-01-10","reading":30187,"time":"17:28"},{"date":"2026-01-11","reading":30191,"time":"17:05"},{"date":"2026-01-12","reading":30195,"time":"16:34"},{"date":"2026-01-13","reading":30199,"time":"13:33"},{"date":"2026-01-14","reading":30204,"time":"11:56"},{"date":"2026-01-15","reading":30208,"time":""},{"date":"2026-01-16","reading":30212,"time":""},{"date":"2026-01-17","reading":30216,"time":""},{"date":"2026-01-18","reading":30221,"time":""},{"date":"2026-01-19","reading":30225,"time":""},{"date":"2026-01-20","reading":30229,"time":""},{"date":"2026-01-21","reading":30233,"time":""},{"date":"2026-01-22","reading":30238,"time":""},{"date":"2026-01-23","reading":30242,"time":""},{"date":"2026-01-24","reading":30246,"time":""},{"date":"2026-01-25","reading":30252,"time":""},{"date":"2026-01-26","reading":30260,"time":""},{"date":"2026-01-27","reading":30268,"time":""},{"date":"2026-01-28","reading":30275,"time":"09:41"},{"date":"2026-01-29","reading":30280,"time":"07:00"},{"date":"2026-01-30","reading":30285,"time":"08:26"},{"date":"2026-01-31","reading":30290,"time":"08:53"},{"date":"2026-02-01","reading":30295,"time":"08:19"},{"date":"2026-02-02","reading":30300,"time":"08:02"},{"date":"2026-02-03","reading":30305,"time":"08:13"},{"date":"2026-02-04","reading":30310,"time":"08:23"},{"date":"2026-02-05","reading":30315,"time":"08:10"},{"date":"2026-02-06","reading":30320,"time":"08:27"},{"date":"2026-02-07","reading":30325,"time":"08:07"},{"date":"2026-02-08","reading":30327,"time":"08:54"},{"date":"2026-02-09","reading":30329,"time":"08:28"},{"date":"2026-02-10","reading":30334,"time":"08:05"},{"date":"2026-02-11","reading":30337,"time":"08:34"},{"date":"2026-02-12","reading":30340,"time":"06:40"},{"date":"2026-02-13","reading":30345,"time":"07:40"},{"date":"2026-02-14","reading":30350,"time":"07:15"},{"date":"2026-02-15","reading":30355,"time":"08:40"},{"date":"2026-02-16","reading":30360,"time":"07:04"},{"date":"2026-02-17","reading":30366,"time":"07:04"},{"date":"2026-02-18","reading":30370,"time":""},{"date":"2026-02-19","reading":30373,"time":""},{"date":"2026-02-20","reading":30377,"time":""},{"date":"2026-02-21","reading":30382,"time":""},{"date":"2026-02-22","reading":30388,"time":""},{"date":"2026-02-23","reading":30392,"time":""},{"date":"2026-02-24","reading":30395,"time":""},{"date":"2026-02-25","reading":30397,"time":""},{"date":"2026-02-26","reading":30399,"time":""},{"date":"2026-02-27","reading":30401,"time":"09:41"},{"date":"2026-02-28","reading":30403,"time":"07:00"},{"date":"2026-03-01","reading":30407,"time":"08:26"},{"date":"2026-03-02","reading":30411,"time":"08:53"},{"date":"2026-03-03","reading":30415,"time":"08:19"},{"date":"2026-03-04","reading":30418,"time":"08:02"},{"date":"2026-03-05","reading":30424,"time":"08:13"},{"date":"2026-03-06","reading":30426,"time":"08:23"},{"date":"2026-03-07","reading":30428,"time":"08:10"},{"date":"2026-03-08","reading":30430,"time":"08:27"},{"date":"2026-03-09","reading":30432,"time":"08:07"},{"date":"2026-03-10","reading":30434,"time":"08:54"}],"cycleDay":28,"initialReading":30136};
+
+  localStorage.setItem('elec2026', JSON.stringify(preloaded));
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// SINCRONIZACIÓN CON SERVIDOR (MySQL via api.php)
+// ═══════════════════════════════════════════════════════
+function syncToServer(data) {
+  fetch('api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch(() => {}); // silencioso si no hay red
+}
+
+async function initApp() {
+  try {
+    const r = await fetch('api.php');
+    if (r.ok) {
+      const serverData = await r.json();
+      if (serverData && serverData.readings && serverData.readings.length > 0) {
+        // El servidor tiene datos → los usa (prevalece sobre localStorage)
+        localStorage.setItem('elec2026', JSON.stringify(serverData));
+      }
+    }
+  } catch(e) {
+    // Sin conexión → usa localStorage local
+  }
+  preloadData();
+  setDefaults();
+  renderHome();
+}
+
+initApp();
+</script>
+</body>
+</html>
