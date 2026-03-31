@@ -279,21 +279,6 @@
         <div class="stat-value orange" id="s-gasto">—</div>
         <div class="stat-unit">$ acumulado</div>
       </div>
-      <div class="stat" style="grid-column:1/-1">
-        <div class="stat-label">Lectura Inicial del Ciclo</div>
-        <div class="stat-value" id="s-inicial" style="color:var(--muted)">—</div>
-        <div class="stat-unit">kWh al inicio del período</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">kWh Estimados</div>
-        <div class="stat-value green" id="s-kwh-est">—</div>
-        <div class="stat-unit">~ al cierre del ciclo</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Monto Estimado</div>
-        <div class="stat-value orange" id="s-monto-est">—</div>
-        <div class="stat-unit">~ CUP al cierre</div>
-      </div>
     </div>
 
     <!-- Progreso del ciclo -->
@@ -421,8 +406,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label>Lectura inicial del ciclo actual (kWh) <span style="font-size:10px;color:var(--accent)">(opcional — sobreescribe el cálculo automático)</span></label>
-        <input type="number" id="cfg-initial" placeholder="ej. 30401">
+        <label>Lectura inicial del año (kWh)</label>
+        <input type="number" id="cfg-initial" placeholder="ej. 30136">
       </div>
       <button class="btn" onclick="saveConfig()" style="margin-bottom:10px">Guardar Configuración</button>
     </div>
@@ -516,19 +501,19 @@ function saveData(d) { localStorage.setItem('elec2026', JSON.stringify(d)); }
 
 // ═══════════════════════════════════════════════════════
 // CICLO: dado un mes (1-12), devuelve el rango de fechas del ciclo
-// El ciclo de "mes N" va desde día cycleDay del mes N-1 hasta día cycleDay-1 del mes N
+// El ciclo de "mes N" va desde día cycleDay del mes N-1 hasta día cycleDay del mes N
+// La lectura del día cycleDay es el CIERRE del ciclo actual y el INICIO del siguiente.
+// Corrección: el fin incluye el propio cycleDay (no cycleDay-1) para capturar
+// lecturas que lleguen exactamente ese día o 1 día antes (variación normal de ETECSA).
 // ═══════════════════════════════════════════════════════
 function getCycleRange(year, month, cycleDay) {
   // mes: 1-12
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
   const start = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
-  // Fin: último día justo antes del cycleDay del mes actual
-  // Ej. ciclo Feb: inicia 28-Ene, termina 27-Feb (el día antes del 28 de feb)
-  const endDay = cycleDay - 1;
-  let endMonth = month, endYear = year;
-  // Si cycleDay=28 el fin es el 27 del mes actual
-  const end = `${endYear}-${String(endMonth).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
+  // Fin: el propio cycleDay del mes actual (inclusive)
+  // Ej. ciclo Mar con cycleDay=28: inicia 28-Feb, termina 28-Mar
+  const end = `${year}-${String(month).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
   return { start, end };
 }
 
@@ -583,13 +568,22 @@ function saveReading() {
 function renderHome() {
   const data = loadData();
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
+
+  // Corrección: determinar el ciclo de facturación ACTIVO.
+  // Si el día de hoy ya superó o igualó el cycleDay, el ciclo activo
+  // es el del mes siguiente (el nuevo período ya comenzó).
+  // Ej: hoy=30-mar, cycleDay=28 → 30>=28 → ciclo activo = Abril
+  let year  = today.getFullYear();
+  let month = today.getMonth() + 1;
+  if (today.getDate() >= data.cycleDay) {
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
 
   const readings = getCycleReadings(year, month);
 
   if (readings.length === 0) {
-    ['s-lectura','s-hoy','s-ciclo','s-gasto','s-inicial','s-kwh-est','s-monto-est'].forEach(id => document.getElementById(id).textContent = '—');
+    ['s-lectura','s-hoy','s-ciclo','s-gasto'].forEach(id => document.getElementById(id).textContent = '—');
     document.getElementById('cb-dias').textContent = '0';
     document.getElementById('cb-restantes').textContent = '—';
     document.getElementById('cb-promedio').textContent = '—';
@@ -602,17 +596,8 @@ function renderHome() {
   const last = readings[readings.length - 1];
   const first = readings[0];
 
-  // Lectura inicial: última lectura registrada ANTES (no incluida) del inicio del ciclo
-  // Si hay override manual en Config, ese prevalece
-  const { start, end } = getCycleRange(year, month, data.cycleDay);
-  const allSortedAll = [...data.readings].sort((a,b) => a.date.localeCompare(b.date));
-  const lecturaInicialObj = allSortedAll.filter(r => r.date < start).pop();
-  const lecturaInicial = (data.initialReading && data.initialReading > 0)
-    ? data.initialReading
-    : (lecturaInicialObj ? lecturaInicialObj.reading : first.reading);
-
   // Consumo ciclo
-  const consumoCiclo = last.reading - lecturaInicial;
+  const consumoCiclo = last.reading - first.reading;
   const gastoCiclo   = calcCost(consumoCiclo);
 
   // Consumo hoy
@@ -630,9 +615,9 @@ function renderHome() {
   document.getElementById('s-hoy').textContent     = consumoHoy === '—' ? '—' : consumoHoy + ' kWh';
   document.getElementById('s-ciclo').textContent   = consumoCiclo + ' kWh';
   document.getElementById('s-gasto').textContent   = '$' + gastoCiclo.toFixed(2);
-  document.getElementById('s-inicial').textContent = lecturaInicial.toLocaleString();
 
   // Progreso
+  const { start, end } = getCycleRange(year, month, data.cycleDay);
   const startD  = new Date(start + 'T12:00:00');
   const endD    = new Date(end + 'T12:00:00');
   const totalDays = Math.round((endD - startD) / 86400000) + 1;
@@ -648,18 +633,6 @@ function renderHome() {
   document.getElementById('prog-start').textContent   = formatDate(start);
   document.getElementById('prog-end').textContent     = formatDate(end);
   document.getElementById('prog-label').textContent   = `${pct}% del ciclo completado`;
-
-  // Proyección al cierre del ciclo
-  if (daysReg > 1) {
-    const promDiaNum = consumoCiclo / (daysReg - 1);
-    const kwhEst     = Math.round(consumoCiclo + promDiaNum * daysLeft);
-    const montoEst   = calcCost(kwhEst);
-    document.getElementById('s-kwh-est').textContent   = '~' + kwhEst + ' kWh';
-    document.getElementById('s-monto-est').textContent = '~$' + montoEst.toFixed(2);
-  } else {
-    document.getElementById('s-kwh-est').textContent   = '—';
-    document.getElementById('s-monto-est').textContent = '—';
-  }
 
   // Datos para gráfica
   const labels = [], values = [];
