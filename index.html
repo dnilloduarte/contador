@@ -242,6 +242,64 @@
 
   .blink { animation: blink 1.5s step-end infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Cierre de Ciclo ── */
+  .cierre-card { border-left: 4px solid var(--accent); }
+  .cierre-card.cierre-urgente { border-left-color: var(--accent2); }
+  .cierre-card.cierre-vencido { border-left-color: var(--red); }
+  .cierre-card.cierre-ok      { border-left-color: var(--green); }
+
+  .cierre-status {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .cierre-badge {
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .cierre-badge.verde   { background: rgba(22,128,60,0.12);  color: var(--green); }
+  .cierre-badge.naranja { background: rgba(212,94,0,0.12);   color: var(--accent2); }
+  .cierre-badge.rojo    { background: rgba(192,57,43,0.12);  color: var(--red); }
+  .cierre-badge.azul    { background: rgba(26,107,191,0.12); color: var(--accent); }
+
+  .cierre-resumen {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 14px;
+  }
+  .cierre-dato {
+    background: #f4f8fc; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .cierre-dato .cd-val { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--accent); }
+  .cierre-dato .cd-val.orange { color: var(--accent2); }
+  .cierre-dato .cd-val.green  { color: var(--green); }
+  .cierre-dato .cd-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 3px; font-weight: 700; }
+
+  .cierre-fecha-info {
+    font-size: 12px; color: var(--muted); text-align: center;
+    margin-bottom: 12px; font-family: var(--mono);
+  }
+  .cierre-fecha-info strong { color: var(--text); }
+
+  .btn-cierre {
+    width: 100%; padding: 13px;
+    background: linear-gradient(135deg, var(--accent), #1557a0);
+    color: #fff; border: none; border-radius: 8px;
+    font-family: var(--sans); font-weight: 700; font-size: 14px;
+    letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 2px 10px rgba(26,107,191,0.30);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-cierre:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,107,191,0.35); }
+  .btn-cierre:active { transform: translateY(0); }
+  .btn-cierre.cerrado {
+    background: linear-gradient(135deg, var(--green), #0f6030);
+    box-shadow: 0 2px 10px rgba(22,128,60,0.30);
+    cursor: default;
+  }
+  .btn-cierre.cerrado:hover { transform: none; }
 </style>
 </head>
 <body>
@@ -300,6 +358,34 @@
     <div class="card">
       <div class="card-title"><span class="dot"></span>Consumo Diario (kWh)</div>
       <div class="chart-wrap"><canvas id="chart-daily"></canvas></div>
+    </div>
+
+    <!-- Cierre de Ciclo -->
+    <div class="card cierre-card" id="cierre-card">
+      <div class="card-title"><span class="dot"></span>Cierre de Ciclo</div>
+      <div class="cierre-status">
+        <span class="cierre-badge azul" id="cierre-badge">Calculando...</span>
+      </div>
+      <div class="cierre-resumen">
+        <div class="cierre-dato">
+          <div class="cd-val green" id="cierre-kwh">—</div>
+          <div class="cd-lbl">kWh consumidos</div>
+        </div>
+        <div class="cierre-dato">
+          <div class="cd-val orange" id="cierre-costo">—</div>
+          <div class="cd-lbl">Costo estimado</div>
+        </div>
+        <div class="cierre-dato">
+          <div class="cd-val" id="cierre-dias-rest">—</div>
+          <div class="cd-lbl">Días al cierre</div>
+        </div>
+        <div class="cierre-dato">
+          <div class="cd-val orange" id="cierre-proyeccion">—</div>
+          <div class="cd-lbl">Proyección final</div>
+        </div>
+      </div>
+      <div class="cierre-fecha-info" id="cierre-fecha-info">—</div>
+      <button class="btn-cierre" id="cierre-btn" onclick="prefillCierre()">📋 Registrar Cierre del Ciclo</button>
     </div>
 
     <!-- Formulario entrada -->
@@ -480,14 +566,7 @@ function calcCost(kwh) {
   return cost;
 }
 
-function getTariffTier(kwh) {
-  let prev = 0;
-  for (const t of TARIFAS) {
-    if (kwh <= t.max) return { label: t.label, price: t.price };
-    prev = t.max;
-  }
-  return TARIFAS[TARIFAS.length-1];
-}
+// Fix 6: getTariffTier() eliminada — era código muerto, no se usaba en ningún lugar
 
 // ═══════════════════════════════════════════════════════
 // STORAGE
@@ -497,7 +576,10 @@ function loadData() {
     return JSON.parse(localStorage.getItem('elec2026') || '{"readings":[],"cycleDay":28,"initialReading":null}');
   } catch(e) { return { readings: [], cycleDay: 28, initialReading: null }; }
 }
-function saveData(d) { localStorage.setItem('elec2026', JSON.stringify(d)); }
+function saveData(d) {
+  localStorage.setItem('elec2026', JSON.stringify(d));
+  syncToServer(d); // Fix 1: sincronizar con servidor en cada guardado
+}
 
 // ═══════════════════════════════════════════════════════
 // CICLO: dado un mes (1-12), devuelve el rango de fechas del ciclo
@@ -506,14 +588,20 @@ function saveData(d) { localStorage.setItem('elec2026', JSON.stringify(d)); }
 // Corrección: el fin incluye el propio cycleDay (no cycleDay-1) para capturar
 // lecturas que lleguen exactamente ese día o 1 día antes (variación normal de ETECSA).
 // ═══════════════════════════════════════════════════════
+// Fix 2: helper para obtener el último día válido de un mes
+function lastDayOfMonth(year, month) {
+  return new Date(year, month, 0).getDate(); // month sin -1 porque Date hace rollback
+}
+
 function getCycleRange(year, month, cycleDay) {
   // mes: 1-12
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
-  const start = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
-  // Fin: el propio cycleDay del mes actual (inclusive)
-  // Ej. ciclo Mar con cycleDay=28: inicia 28-Feb, termina 28-Mar
-  const end = `${year}-${String(month).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
+  // Clamp el día al último día válido del mes correspondiente
+  const startDay = Math.min(cycleDay, lastDayOfMonth(prevYear, prevMonth));
+  const endDay   = Math.min(cycleDay, lastDayOfMonth(year, month));
+  const start = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(startDay).padStart(2,'0')}`;
+  const end   = `${year}-${String(month).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
   return { start, end };
 }
 
@@ -559,7 +647,10 @@ function saveReading() {
 
   saveData(data);
   renderHome();
-  renderCurrentMonthTable();
+  // Fix 10: solo re-renderizar la tabla del mes si esa pestaña está activa
+  if (document.getElementById('sec-mes').classList.contains('active')) {
+    renderCurrentMonthTable();
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -590,6 +681,7 @@ function renderHome() {
     document.getElementById('prog-label').textContent = 'Sin lecturas registradas aún';
     document.getElementById('prog-fill').style.width = '0%';
     renderDailyChart([], []);
+    renderCierre(data, year, month, []);
     return;
   }
 
@@ -618,13 +710,15 @@ function renderHome() {
 
   // Progreso
   const { start, end } = getCycleRange(year, month, data.cycleDay);
-  const startD  = new Date(start + 'T12:00:00');
-  const endD    = new Date(end + 'T12:00:00');
-  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+  const startD    = new Date(start + 'T12:00:00');
+  const endD      = new Date(end + 'T12:00:00');
+  const totalDays = Math.max(1, Math.round((endD - startD) / 86400000));
   const daysReg   = readings.length;
-  const daysLeft  = Math.max(0, Math.round((endD - today) / 86400000));
-  const pct       = Math.min(100, Math.round(daysReg / totalDays * 100));
-  const promDia   = daysReg > 1 ? (consumoCiclo / (daysReg - 1)).toFixed(1) : '—';
+  // Fix 4: pct basado en días transcurridos reales, no en cantidad de lecturas
+  const daysElapsed = Math.max(0, Math.round((today - startD) / 86400000));
+  const daysLeft    = Math.max(0, Math.round((endD - today) / 86400000));
+  const pct         = Math.min(100, Math.round(daysElapsed / totalDays * 100));
+  const promDia     = daysReg > 1 ? (consumoCiclo / (daysReg - 1)).toFixed(1) : '—';
 
   document.getElementById('cb-dias').textContent      = daysReg;
   document.getElementById('cb-restantes').textContent = daysLeft;
@@ -641,6 +735,107 @@ function renderHome() {
     values.push(readings[i].reading - readings[i-1].reading);
   }
   renderDailyChart(labels, values);
+
+  // Renderizar tarjeta de cierre
+  renderCierre(data, year, month, readings);
+}
+
+// ═══════════════════════════════════════════════════════
+// CIERRE DE CICLO
+// ═══════════════════════════════════════════════════════
+function renderCierre(data, year, month, readings) {
+  const card    = document.getElementById('cierre-card');
+  const badge   = document.getElementById('cierre-badge');
+  const btn     = document.getElementById('cierre-btn');
+  const info    = document.getElementById('cierre-fecha-info');
+  const today   = new Date();
+
+  // Fecha de cierre del ciclo activo
+  const { end } = getCycleRange(year, month, data.cycleDay);
+  const endD    = new Date(end + 'T12:00:00');
+  const daysLeft = Math.round((endD - today) / 86400000);
+
+  // ¿Ya existe lectura de cierre? (lectura del día exacto de cierre)
+  const cierreRead = readings.find(r => r.date === end);
+
+  // Consumo y costo actuales
+  const kwh  = readings.length >= 2
+    ? readings[readings.length-1].reading - readings[0].reading
+    : 0;
+  const cost = calcCost(kwh);
+
+  // Proyección al cierre (kWh/día promedio × días restantes + consumo actual)
+  const promDia = readings.length >= 2
+    ? kwh / (readings.length - 1)
+    : null;
+  const proyKwh  = promDia !== null ? Math.round(kwh + promDia * Math.max(0, daysLeft)) : null;
+  const proyCost = proyKwh !== null ? calcCost(proyKwh) : null;
+
+  // Actualizar valores numéricos
+  document.getElementById('cierre-kwh').textContent      = kwh > 0 ? kwh + ' kWh' : '—';
+  document.getElementById('cierre-costo').textContent    = cost > 0 ? '$' + cost.toFixed(2) : '—';
+  document.getElementById('cierre-dias-rest').textContent = daysLeft >= 0 ? daysLeft : '0';
+  document.getElementById('cierre-proyeccion').textContent = proyCost !== null ? '$' + proyCost.toFixed(2) : '—';
+
+  // Estado según si ya está cerrado o cuántos días faltan
+  card.className = 'card cierre-card';
+
+  if (cierreRead) {
+    // Ciclo cerrado
+    card.classList.add('cierre-ok');
+    badge.className = 'cierre-badge azul';
+    badge.textContent = '✓ Ciclo Cerrado';
+    info.innerHTML = `Cierre registrado el <strong>${formatDate(end)}</strong> — Lectura: <strong>${cierreRead.reading.toLocaleString()} kWh</strong>`;
+    btn.className = 'btn-cierre cerrado';
+    btn.textContent = '✓ Ciclo cerrado correctamente';
+    btn.onclick = null;
+  } else if (daysLeft > 5) {
+    card.classList.add('');
+    badge.className = 'cierre-badge verde';
+    badge.textContent = `${daysLeft} días para el cierre`;
+    info.innerHTML = `Cierre del ciclo: <strong>${formatDate(end)}</strong>`;
+    btn.className = 'btn-cierre';
+    btn.innerHTML = '📋 Registrar Cierre del Ciclo';
+    btn.onclick = prefillCierre;
+  } else if (daysLeft >= 0) {
+    card.classList.add('cierre-urgente');
+    badge.className = 'cierre-badge naranja';
+    badge.textContent = daysLeft === 0 ? '¡Hoy es el cierre!' : `¡${daysLeft} día${daysLeft===1?'':'s'} para cerrar!`;
+    info.innerHTML = `Cierre del ciclo: <strong>${formatDate(end)}</strong>`;
+    btn.className = 'btn-cierre';
+    btn.innerHTML = '📋 Registrar Cierre del Ciclo';
+    btn.onclick = prefillCierre;
+  } else {
+    // Pasó la fecha y no se cerró
+    card.classList.add('cierre-vencido');
+    badge.className = 'cierre-badge rojo';
+    badge.textContent = `Cierre pendiente (hace ${Math.abs(daysLeft)} días)`;
+    info.innerHTML = `Fecha de cierre: <strong>${formatDate(end)}</strong> — Sin registrar`;
+    btn.className = 'btn-cierre';
+    btn.innerHTML = '⚠️ Registrar Cierre Pendiente';
+    btn.onclick = prefillCierre;
+  }
+}
+
+// Pre-rellena el formulario con la fecha de cierre y hace scroll hasta él
+function prefillCierre() {
+  const data  = loadData();
+  const today = new Date();
+  let year    = today.getFullYear();
+  let month   = today.getMonth() + 1;
+  if (today.getDate() >= data.cycleDay) {
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
+  const { end } = getCycleRange(year, month, data.cycleDay);
+
+  document.getElementById('inp-fecha').value   = end;
+  document.getElementById('inp-lectura').value = '';
+  document.getElementById('inp-lectura').focus();
+
+  // Scroll suave hasta el formulario
+  document.getElementById('inp-fecha').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast(`📋 Fecha puesta al ${formatDate(end)} — ingresa la lectura`);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -685,8 +880,7 @@ function renderCurrentMonthTable() {
     const r    = readings[i];
     const prev = i > 0 ? readings[i-1] : null;
     const kwh  = prev ? r.reading - prev.reading : null;
-    const cost = kwh !== null ? (kwh / (readings[readings.length-1].reading - readings[0].reading)) * calcCost(readings[readings.length-1].reading - readings[0].reading) : null;
-    // Gasto diario proporcional al kWh del día
+    // Fix 5: eliminada variable 'cost' que se calculaba pero nunca se usaba
     const gastoDia = kwh !== null && kwh > 0 ? calcCost(kwh) : null;
 
     if (kwh !== null) { totalKwh += kwh; totalGasto += gastoDia || 0; }
@@ -744,9 +938,10 @@ function renderResumen() {
   list.innerHTML = '';
   const yearLabels = [], yearKwh = [];
   let grandKwh = 0, grandCost = 0;
+  const currentYear = new Date().getFullYear(); // Fix 7: año dinámico
 
   for (let m = 1; m <= 12; m++) {
-    const readings = getCycleReadings(2026, m);
+    const readings = getCycleReadings(currentYear, m);
     let kwh = 0, cost = 0, hasData = false;
     if (readings.length >= 2) {
       kwh  = readings[readings.length-1].reading - readings[0].reading;
@@ -771,6 +966,10 @@ function renderResumen() {
   totRow.className = 'summary-row total-row';
   totRow.innerHTML = `<span class="smes">TOTAL AÑO</span><span class="skwh">${grandKwh > 0 ? grandKwh + ' kWh' : '—'}</span><span class="scost">${grandCost > 0 ? '$' + grandCost.toFixed(2) : '—'}</span>`;
   list.appendChild(totRow);
+
+  // Fix 7b: título dinámico del resumen
+  const titleEl = document.querySelector('#sec-resumen .card-title');
+  if (titleEl) titleEl.innerHTML = `<span class="dot"></span>Resumen Anual ${currentYear}`;
 
   renderAnualChart(yearLabels, yearKwh);
   renderTariffGrid(grandKwh > 0 ? grandKwh : null);
@@ -816,6 +1015,8 @@ function exportData() {
   a.href = URL.createObjectURL(blob);
   a.download = 'electricidad_2026.json';
   a.click();
+  // Fix 8: liberar el objeto URL para evitar memory leak
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   showToast('✓ Datos exportados');
 }
 
@@ -823,8 +1024,10 @@ function confirmClear() {
   if (confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) {
     localStorage.removeItem('elec2026');
     showToast('Datos eliminados');
+    // Fix 9: re-renderizar todas las vistas para que no queden datos obsoletos
     renderHome();
     renderCurrentMonthTable();
+    renderResumen();
   }
 }
 
@@ -957,8 +1160,14 @@ async function initApp() {
     if (r.ok) {
       const serverData = await r.json();
       if (serverData && serverData.readings && serverData.readings.length > 0) {
-        // El servidor tiene datos → los usa (prevalece sobre localStorage)
-        localStorage.setItem('elec2026', JSON.stringify(serverData));
+        // Fix 3: solo sobreescribir si el servidor tiene más lecturas que el local,
+        // evitando la condición de carrera donde datos locales más nuevos se pierden.
+        const localRaw = localStorage.getItem('elec2026');
+        const localData = localRaw ? JSON.parse(localRaw) : null;
+        const localCount = localData?.readings?.length || 0;
+        if (serverData.readings.length >= localCount) {
+          localStorage.setItem('elec2026', JSON.stringify(serverData));
+        }
       }
     }
   } catch(e) {
